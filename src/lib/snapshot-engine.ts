@@ -103,6 +103,7 @@ export async function pullClientSnapshot(
           insertErr &&
           /sum_traffic|column/i.test(insertErr.message ?? '')
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const withoutTraffic = rows.map(
             ({ sum_traffic: _s, ...rest }) => rest
           )

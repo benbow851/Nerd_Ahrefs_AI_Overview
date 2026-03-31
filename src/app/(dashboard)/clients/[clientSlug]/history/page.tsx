@@ -28,12 +28,6 @@ export default async function ClientHistoryPage({ params }: HistoryPageProps) {
     () => [],
   )
 
-  const chartData = history.map((h) => ({
-    report_month: h.report_month,
-    total_citations: h.total_citations,
-    kpi_target: h.kpi_target,
-  }))
-
   const formatPulledBangkok = (iso: string | null) => {
     if (!iso) return '—'
     try {
