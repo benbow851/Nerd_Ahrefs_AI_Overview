@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   NerdOptimize Design Tokens
+   ============================================================ */
+:root {
+  --navy: #1d252d;
+  --blue: #4d62a7;
+  --cloud: #dfe6ef;
+  --eggshell: #d9d4c8;
+  --white: #ffffff;
+
+  /* Semantic */
+  --bg-primary: var(--navy);
+  --bg-secondary: #252e38;
+  --bg-card: #1a2028;
+  --bg-surface: #222b34;
+  --text-primary: var(--cloud);
+  --text-secondary: #8fa3b0;
+  --text-muted: #5a6e7a;
+  --accent: var(--blue);
+  --accent-hover: #5d74c4;
+  --border: rgba(223, 230, 239, 0.1);
+  --border-strong: rgba(223, 230, 239, 0.2);
+
+  /* Status */
+  --status-success: #44a2a5;
+  --status-warning: #f7991a;
+  --status-danger: #bf415c;
+  --status-info: #4d62a7;
+
+  /* Partner accent (Ahrefs-adjacent, subtle co-brand) */
+  --partner-accent: #e07332;
+  --partner-accent-muted: rgba(224, 115, 50, 0.22);
+
+  /* Gradients */
+  --gradient-hero: linear-gradient(135deg, #1d252d 0%, #252e48 100%);
+  --gradient-card: linear-gradient(180deg, #222b34 0%, #1a2028 100%);
+  --gradient-blue: linear-gradient(135deg, #4d62a7 0%, #3a4d8a 100%);
+
+  /* shadcn CSS vars (mapped to NerdOptimize palette) */
+  --background: 210 15% 10%;
+  --foreground: 210 25% 88%;
+  --card: 210 20% 11%;
+  --card-foreground: 210 25% 88%;
+  --popover: 210 20% 11%;
+  --popover-foreground: 210 25% 88%;
+  --primary: 225 37% 48%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 18% 18%;
+  --secondary-foreground: 210 25% 75%;
+  --muted: 210 18% 16%;
+  --muted-foreground: 210 15% 55%;
+  --accent: 225 37% 48%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 345 49% 49%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 210 18% 18%;
+  --input: 210 18% 20%;
+  --ring: 225 37% 48%;
+  --radius: 0.75rem;
+}
+
+/* ============================================================
+   Base styles
+   ============================================================ */
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-poppins), var(--font-mitr), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   Utility classes
+   ============================================================ */
+.thai {
+  font-family: 'Mitr', sans-serif;
+}
+
+.card-nerd {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+/* Co-brand hero strip (NerdOptimize × Ahrefs) */
+.hero-co-brand {
+  border-left: 3px solid var(--partner-accent);
+  background: linear-gradient(
+    90deg,
+    rgba(224, 115, 50, 0.08) 0%,
+    transparent 55%
+  );
+}
+
+.badge-partner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--partner-accent);
+  border: 1px solid var(--partner-accent-muted);
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+}
+
+.badge-keyword {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(77, 98, 167, 0.2);
+  color: var(--cloud);
+  border: 1px solid rgba(77, 98, 167, 0.4);
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge-keyword-organic {
+  background: rgba(223, 230, 239, 0.08);
+  border-color: rgba(223, 230, 239, 0.2);
+  color: var(--text-secondary);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(77, 98, 167, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 98, 167, 0.7);
+}
+
+/* Progress bar animation */
+.progress-bar-fill {
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Table row hover */
+.table-row-hover:hover {
+  background: rgba(77, 98, 167, 0.06);
+}
