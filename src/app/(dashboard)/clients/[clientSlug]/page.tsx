@@ -11,6 +11,15 @@ import {
   getEverFetchedUrlIds,
 } from '@/lib/queries'
 import {
+  computeKpiPercent,
+  isKpiPassed,
+  isLegacyCommitment,
+  kpiColorThreshold,
+  kpiDenominator,
+  COMMITMENT_TYPE_LABELS,
+} from '@/lib/kpi-calculator'
+import { countActiveTrackedKeywords } from '@/lib/tracked-keywords'
+import {
   formatSnapshotMonth,
   getDefaultSnapshotDate,
   kpiPercent,
@@ -48,10 +57,16 @@ export default async function ClientDetailPage({
   const client = await getClientBySlug(supabase, params.clientSlug).catch(() => null)
   if (!client) notFound()
 
-  const [history, clientUrls, everFetchedUrlIds] = await Promise.all([
+  const commitmentType = client.commitment_type ?? 'ai_citations'
+  const legacy = isLegacyCommitment(commitmentType)
+
+  const [history, clientUrls, everFetchedUrlIds, liveTrackedCount] = await Promise.all([
     getClientMonthlyReportHistory(supabase, client.id, 24).catch(() => []),
     getClientUrls(supabase, client.id).catch(() => []),
     getEverFetchedUrlIds(supabase, client.id).catch(() => new Set<string>()),
+    legacy
+      ? countActiveTrackedKeywords(supabase, client.id).catch(() => 0)
+      : Promise.resolve(0),
   ])
 
   // ── Mode + month selection ───────────────────────────────────────────────────
@@ -133,7 +148,12 @@ export default async function ClientDetailPage({
   const focusUrlDenominator = focusUrlCount > 0 ? focusUrlCount : totalUrlCount
   const totalCitations = kpiRows.reduce((s, r) => s + r.aiCitations, 0)
   const kpiTarget = client.kpi_keyword_target ?? 0
-  const overallKpiPct = kpiPercent(totalCitations, kpiTarget)
+  const totalTracked =
+    kpiSnapshot?.total_tracked_keywords ?? liveTrackedCount ?? 0
+  const kpiDenom = kpiDenominator(client, totalTracked)
+  const overallKpiPct = computeKpiPercent(totalCitations, client, totalTracked)
+  const passThreshold = kpiColorThreshold(client)
+  const kpiPassed = isKpiPassed(totalCitations, client, totalTracked)
   const defaultPullDate = getDefaultSnapshotDate()
 
   const previousMonthLabel = kpiPrevMonthRow
@@ -154,13 +174,22 @@ export default async function ClientDetailPage({
     citationsPrev !== null && kpiSnapshot ? totalCitations - citationsPrev : null
 
   const previousKpiPct =
-    kpiPrevMonthRow &&
-    kpiPrevMonthRow.kpi_target &&
-    kpiPrevMonthRow.total_citations !== null
-      ? kpiPercent(kpiPrevMonthRow.total_citations, kpiPrevMonthRow.kpi_target)
+    kpiPrevMonthRow && kpiPrevMonthRow.total_citations !== null
+      ? legacy
+        ? computeKpiPercent(
+            kpiPrevMonthRow.total_citations,
+            client,
+            kpiPrevMonthRow.total_tracked_keywords
+          )
+        : kpiPrevMonthRow.kpi_target
+          ? kpiPercent(
+              kpiPrevMonthRow.total_citations,
+              kpiPrevMonthRow.kpi_target
+            )
+          : null
       : null
   const kpiPctDelta =
-    previousKpiPct !== null && kpiTarget > 0 && kpiSnapshot
+    previousKpiPct !== null && kpiDenom > 0 && kpiSnapshot
       ? overallKpiPct - previousKpiPct
       : null
 
@@ -204,7 +233,7 @@ export default async function ClientDetailPage({
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--blue)] transition-colors self-start"
             >
               <LinkIcon size={14} strokeWidth={1.75} />
-              Manage URLs
+              {legacy ? 'Manage keywords' : 'Manage URLs'}
             </Link>
             <PullSnapshotButton
               clientId={client.id}
@@ -216,15 +245,31 @@ export default async function ClientDetailPage({
         {/* 4 KPI cards — always sourced from kpiMonthRow (latest in All-months mode) */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <KpiCard
-            label="KPI Target"
-            value={kpiTarget > 0 ? kpiTarget.toLocaleString() : '—'}
-            sub="Project keyword goal"
+            label={legacy ? 'Pass threshold' : 'KPI Target'}
+            value={
+              legacy
+                ? `${Number(client.kpi_pass_threshold ?? 70)}%`
+                : kpiTarget > 0
+                ? kpiTarget.toLocaleString()
+                : '—'
+            }
+            sub={
+              legacy
+                ? COMMITMENT_TYPE_LABELS.legacy_main_longtail
+                : 'Project keyword goal'
+            }
             color="default"
             icon={<Target size={18} />}
           />
           <KpiCard
-            label="AI Citations"
-            value={totalCitations > 0 ? totalCitations.toLocaleString() : '0'}
+            label={legacy ? 'Cited keywords' : 'AI Citations'}
+            value={
+              legacy
+                ? `${totalCitations}/${totalTracked || '—'}`
+                : totalCitations > 0
+                ? totalCitations.toLocaleString()
+                : '0'
+            }
             sub={
               kpiMonthLabel
                 ? `${kpiMonthLabel} snapshot`
@@ -241,16 +286,20 @@ export default async function ClientDetailPage({
           />
           <KpiCard
             label="Overall %"
-            value={kpiTarget > 0 ? `${overallKpiPct}%` : '—'}
-            sub="Citations / target"
+            value={kpiDenom > 0 ? `${overallKpiPct}%` : '—'}
+            sub={
+              legacy
+                ? kpiPassed
+                  ? 'PASS — AI Overview cited'
+                  : `Need ≥ ${passThreshold}%`
+                : 'Citations / target'
+            }
             color={
-              kpiTarget === 0
+              kpiDenom === 0
                 ? 'default'
-                : overallKpiPct >= 100
+                : kpiPassed
                 ? 'success'
-                : overallKpiPct >= 60
-                ? 'blue'
-                : overallKpiPct >= 30
+                : overallKpiPct >= passThreshold * 0.85
                 ? 'warning'
                 : 'danger'
             }

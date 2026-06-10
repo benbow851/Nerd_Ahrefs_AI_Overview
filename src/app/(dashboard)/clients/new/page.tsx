@@ -17,7 +17,8 @@ import {
   Tags,
 } from 'lucide-react'
 import { normalizeRootDomain, slugify } from '@/lib/utils'
-import type { ClientFormValues } from '@/types'
+import { COMMITMENT_TYPE_LABELS } from '@/lib/kpi-calculator'
+import type { ClientFormValues, CommitmentType } from '@/types'
 import { toast } from '@/components/ui/use-toast'
 import { TagInput } from '@/components/ui/tag-input'
 
@@ -31,12 +32,15 @@ const schema = z.object({
     .string()
     .min(1, 'URL slug is required')
     .regex(/^[a-z0-9-]+$/, 'Use lowercase letters, numbers, and hyphens only'),
+  commitment_type: z.enum(['ai_citations', 'legacy_main_longtail']),
+  kpi_pass_threshold: z.coerce.number().min(1).max(100),
   kpi_keyword_target: z.coerce.number().int().min(1).max(9_999_999),
   focus_url_count: z.coerce.number().int().min(0).max(9_999_999),
   tags: z.array(z.string().min(1).max(40)).max(20),
   folder: z.string().max(80),
   bulk_urls_text: z.string(),
   bulk_urls_fetch_limit: z.coerce.number().int().min(1).max(1000),
+  legacy_setup_text: z.string(),
 })
 
 function Field({
@@ -96,19 +100,25 @@ export default function NewClientPage() {
       name: '',
       domain: '',
       slug: '',
+      commitment_type: 'ai_citations',
+      kpi_pass_threshold: 70,
       kpi_keyword_target: 30,
       focus_url_count: 0,
       tags: [],
       folder: '',
       bulk_urls_text: '',
       bulk_urls_fetch_limit: 30,
+      legacy_setup_text: '',
     },
   })
 
   const watchedName = watch('name')
   const watchedDomain = watch('domain')
   const watchedSlug = watch('slug')
+  const watchedCommitment = watch('commitment_type')
+  const isLegacy = watchedCommitment === 'legacy_main_longtail'
   const watchedKpi = watch('kpi_keyword_target')
+  const watchedThreshold = watch('kpi_pass_threshold')
   const watchedFocusUrlCount = watch('focus_url_count')
   const watchedFolder = watch('folder')
   const watchedTags = watch('tags')
@@ -122,6 +132,7 @@ export default function NewClientPage() {
   const { onBlur: domainOnBlur, ...domainRegister } = register('domain')
 
   const onSubmit = async (data: ClientFormValues) => {
+    const legacyMode = data.commitment_type === 'legacy_main_longtail'
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
@@ -130,12 +141,15 @@ export default function NewClientPage() {
           name: data.name,
           domain: normalizeRootDomain(data.domain),
           slug: data.slug,
+          commitment_type: data.commitment_type,
+          kpi_pass_threshold: data.kpi_pass_threshold,
           kpi_keyword_target: data.kpi_keyword_target,
           focus_url_count: data.focus_url_count,
           tags: data.tags,
           folder: data.folder.trim() || null,
-          bulk_urls_text: data.bulk_urls_text || undefined,
+          bulk_urls_text: legacyMode ? undefined : data.bulk_urls_text || undefined,
           bulk_urls_fetch_limit: data.bulk_urls_fetch_limit,
+          legacy_setup_text: legacyMode ? data.legacy_setup_text || undefined : undefined,
         }),
       })
 
@@ -323,22 +337,78 @@ export default function NewClientPage() {
           <div className="pt-2 border-t border-[var(--border)] space-y-4">
             <div className="flex items-center gap-2 text-[var(--text-primary)]">
               <SlidersHorizontal size={16} className="text-[var(--blue)]" />
+              <h2 className="text-sm font-semibold">Measurement mode</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(
+                ['ai_citations', 'legacy_main_longtail'] as CommitmentType[]
+              ).map((mode) => (
+                <label
+                  key={mode}
+                  className={`flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    watchedCommitment === mode
+                      ? 'border-[var(--blue)] bg-[var(--blue)]/5'
+                      : 'border-[var(--border)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="radio"
+                      value={mode}
+                      {...register('commitment_type')}
+                      className="text-[var(--blue)]"
+                    />
+                    {COMMITMENT_TYPE_LABELS[mode]}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)] pl-6">
+                    {mode === 'ai_citations'
+                      ? 'Ahrefs ค้นหา AI citations อัตโนมัติ (แบบใหม่)'
+                      : 'กำหนด Main + Keywords เอง — ผ่านเมื่อติด ≥ threshold %'}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-[var(--status-warning)]">
+              โหมดนี้เลือกครั้งเดียวตอนสร้าง — เปลี่ยนไม่ได้ภายหลัง
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-[var(--border)] space-y-4">
+            <div className="flex items-center gap-2 text-[var(--text-primary)]">
+              <SlidersHorizontal size={16} className="text-[var(--blue)]" />
               <h2 className="text-sm font-semibold">Project KPI</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field
-                label="Keyword / citation goal"
-                hint="ใช้บนการ์ด Dashboard และ progress bar"
-                error={errors.kpi_keyword_target?.message}
-              >
-                <input
-                  type="number"
-                  min={1}
-                  max={9_999_999}
-                  {...register('kpi_keyword_target', { valueAsNumber: true })}
-                  className={inputCls(!!errors.kpi_keyword_target)}
-                />
-              </Field>
+              {isLegacy ? (
+                <Field
+                  label="KPI pass threshold (%)"
+                  hint="ติด AI Overview ≥ % นี้ของ Main + Keywords รวม = ผ่าน"
+                  error={errors.kpi_pass_threshold?.message}
+                >
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    step={0.1}
+                    {...register('kpi_pass_threshold', { valueAsNumber: true })}
+                    className={inputCls(!!errors.kpi_pass_threshold)}
+                  />
+                </Field>
+              ) : (
+                <Field
+                  label="Keyword / citation goal"
+                  hint="ใช้บนการ์ด Dashboard และ progress bar"
+                  error={errors.kpi_keyword_target?.message}
+                >
+                  <input
+                    type="number"
+                    min={1}
+                    max={9_999_999}
+                    {...register('kpi_keyword_target', { valueAsNumber: true })}
+                    className={inputCls(!!errors.kpi_keyword_target)}
+                  />
+                </Field>
+              )}
               <Field
                 label="Focus URL count"
                 hint="จำนวน URL ที่ตั้งเป้า — ใช้เป็นตัวหารใน Published progress"
@@ -353,11 +423,34 @@ export default function NewClientPage() {
                 />
               </Field>
             </div>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Per-URL Ahrefs fetch limit ตั้งได้ที่ Manage URLs หลังสร้างโปรเจกต์
-            </p>
+            {!isLegacy && (
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Per-URL Ahrefs fetch limit ตั้งได้ที่ Manage URLs หลังสร้างโปรเจกต์
+              </p>
+            )}
           </div>
 
+          {isLegacy && (
+            <div className="border border-[var(--border)] rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                URL + Main Keyword + Keywords
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                หนึ่งบรรทัดต่อ URL:{' '}
+                <code className="text-[var(--text-secondary)]">
+                  URL | Main Keyword | keyword1, keyword2
+                </code>
+              </p>
+              <textarea
+                {...register('legacy_setup_text')}
+                rows={8}
+                placeholder={`https://example.com/page | คำหลัก | longtail1, longtail2\n/seo/ | main kw | kw a\nkw b`}
+                className="w-full px-3 py-2.5 rounded-lg text-sm font-mono bg-[var(--bg-surface)] border border-[var(--border)]"
+              />
+            </div>
+          )}
+
+          {!isLegacy && (
           <div className="border border-[var(--border)] rounded-lg overflow-hidden">
             <button
               type="button"
@@ -403,6 +496,7 @@ export default function NewClientPage() {
               </div>
             )}
           </div>
+          )}
 
           <button
             type="submit"
@@ -467,10 +561,24 @@ export default function NewClientPage() {
               </div>
               <div>
                 <dt className="text-[var(--text-muted)] text-xs mb-0.5">
-                  KPI target
+                  Mode
+                </dt>
+                <dd className="text-[var(--text-primary)] text-xs">
+                  {COMMITMENT_TYPE_LABELS[watchedCommitment]}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[var(--text-muted)] text-xs mb-0.5">
+                  {isLegacy ? 'Pass threshold' : 'KPI target'}
                 </dt>
                 <dd className="text-[var(--text-primary)] tabular-nums">
-                  {typeof watchedKpi === 'number' ? watchedKpi : '—'}
+                  {isLegacy
+                    ? typeof watchedThreshold === 'number'
+                      ? `${watchedThreshold}%`
+                      : '—'
+                    : typeof watchedKpi === 'number'
+                    ? watchedKpi
+                    : '—'}
                 </dd>
               </div>
               <div>

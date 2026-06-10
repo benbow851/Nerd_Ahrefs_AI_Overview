@@ -87,7 +87,9 @@ export async function getClientSnapshotRowsForReporting(
 ) {
   const { data, error } = await supabase
     .from('snapshots')
-    .select('id, snapshot_date, pulled_at, total_citations, kpi_target, total_urls')
+    .select(
+      'id, snapshot_date, pulled_at, total_citations, kpi_target, total_urls, total_tracked_keywords, commitment_type, kpi_pass_threshold'
+    )
     .eq('client_id', clientId)
     .order('pulled_at', { ascending: false, nullsFirst: false })
 
@@ -104,6 +106,9 @@ export type MonthlyReportSnapshot = {
   total_citations: number | null
   kpi_target: number | null
   total_urls: number | null
+  total_tracked_keywords: number | null
+  commitment_type: string | null
+  kpi_pass_threshold: number | null
 }
 
 /**
@@ -139,6 +144,9 @@ export async function getClientMonthlyReportHistory(
       total_citations: snap.total_citations,
       kpi_target: snap.kpi_target,
       total_urls: snap.total_urls,
+      total_tracked_keywords: snap.total_tracked_keywords,
+      commitment_type: snap.commitment_type,
+      kpi_pass_threshold: snap.kpi_pass_threshold,
     }))
 
   return sorted.slice(-maxMonths)
@@ -300,11 +308,13 @@ export function buildUrlKpiRows(
       aiCitationsDelta,
       keywords: kwResults.map(k => ({
         keyword: k.keyword,
+        tier: k.keyword_tier ?? null,
         kind: k.best_position_kind,
         position: k.best_position,
         volume: k.volume,
         sum_traffic: k.sum_traffic ?? null,
         serp_features: k.serp_features ?? null,
+        isCited: keywordHasSerpAiOverview(k),
       })),
       missingKeywords,
     }
@@ -364,6 +374,9 @@ export async function getAggregatedClientSnapshot(
     total_citations: null,
     total_serp_ai_overlap: null,
     kpi_target: null,
+    commitment_type: null,
+    kpi_pass_threshold: null,
+    total_tracked_keywords: null,
     notes: null,
     url_keyword_results: Array.from(
       dedup.values(),

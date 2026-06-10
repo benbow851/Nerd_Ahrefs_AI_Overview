@@ -1,5 +1,6 @@
 import { Users, Zap, TrendingUp, Trophy } from 'lucide-react'
 import { KpiCard } from './KpiCard'
+import { isKpiPassed } from '@/lib/kpi-calculator'
 import type { ClientWithLatestSnapshot } from '@/types'
 
 interface SummaryStatsProps {
@@ -23,8 +24,12 @@ export function SummaryStats({ clients }: SummaryStatsProps) {
         )
       : 0
 
-  const clientsAtTarget = clients.filter(
-    (c) => c.kpi_pct !== null && c.kpi_pct >= 100,
+  const clientsAtTarget = clients.filter((c) =>
+    isKpiPassed(
+      c.total_citations ?? 0,
+      c,
+      c.total_tracked_keywords
+    )
   ).length
 
   return (

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { isLegacyCommitment, kpiColorThreshold } from '@/lib/kpi-calculator'
 import type { ClientWithLatestSnapshot } from '@/types'
 import { DomainFavicon } from '@/components/ui/domain-favicon'
 
@@ -11,19 +12,17 @@ interface ClientRowProps {
   client: ClientWithLatestSnapshot
 }
 
-function kpiColor(pct: number | null): string {
+function kpiColor(pct: number | null, passAt: number): string {
   if (pct === null) return 'text-[var(--text-muted)]'
-  if (pct >= 100) return 'text-[var(--status-success)]'
-  if (pct >= 60)  return 'text-[var(--blue)]'
-  if (pct >= 30)  return 'text-[var(--status-warning)]'
+  if (pct >= passAt) return 'text-[var(--status-success)]'
+  if (pct >= passAt * 0.85) return 'text-[var(--status-warning)]'
   return 'text-[var(--status-danger)]'
 }
 
-function kpiBarColor(pct: number | null): string {
+function kpiBarColor(pct: number | null, passAt: number): string {
   if (pct === null) return 'bg-[var(--text-muted)]'
-  if (pct >= 100) return 'bg-[var(--status-success)]'
-  if (pct >= 60)  return 'bg-[var(--blue)]'
-  if (pct >= 30)  return 'bg-[var(--status-warning)]'
+  if (pct >= passAt) return 'bg-[var(--status-success)]'
+  if (pct >= passAt * 0.85) return 'bg-[var(--status-warning)]'
   return 'bg-[var(--status-danger)]'
 }
 
@@ -44,6 +43,8 @@ export function ClientRow({ client }: ClientRowProps) {
   const [pulling, setPulling] = useState(false)
   const [pullError, setPullError] = useState<string | null>(null)
 
+  const legacy = isLegacyCommitment(client.commitment_type ?? 'ai_citations')
+  const passAt = kpiColorThreshold(client)
   const pct = client.kpi_pct !== null ? Math.round(client.kpi_pct) : null
   const barWidth = pct !== null ? Math.min(pct, 100) : 0
 
@@ -78,6 +79,11 @@ export function ClientRow({ client }: ClientRowProps) {
           <DomainFavicon domain={client.domain} size={22} />
           {client.name}
         </Link>
+        {legacy && (
+          <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase bg-[var(--status-warning)]/15 text-[var(--status-warning)] border border-[var(--status-warning)]/30">
+            Legacy
+          </span>
+        )}
         <span className="ml-2 inline-block rounded-full px-2 py-0.5 text-xs bg-[var(--bg-secondary)] text-[var(--text-muted)] border border-[var(--border)]">
           {client.domain}
         </span>
@@ -117,7 +123,9 @@ export function ClientRow({ client }: ClientRowProps) {
         </span>
         <span className="text-[var(--text-muted)]">
           {' / '}
-          {client.kpi_keyword_target ?? '—'}
+          {legacy
+            ? client.total_tracked_keywords ?? '—'
+            : client.kpi_keyword_target ?? '—'}
         </span>
       </td>
 
@@ -127,11 +135,11 @@ export function ClientRow({ client }: ClientRowProps) {
           {/* Mini bar */}
           <div className="h-1.5 w-20 rounded-full bg-[var(--bg-surface)] overflow-hidden flex-shrink-0">
             <div
-              className={cn('h-full rounded-full transition-[width] duration-500', kpiBarColor(pct))}
+              className={cn('h-full rounded-full transition-[width] duration-500', kpiBarColor(pct, passAt))}
               style={{ width: `${barWidth}%` }}
             />
           </div>
-          <span className={cn('text-sm font-semibold tabular-nums', kpiColor(pct))}>
+          <span className={cn('text-sm font-semibold tabular-nums', kpiColor(pct, passAt))}>
             {pct !== null ? `${pct}%` : '—'}
           </span>
         </div>

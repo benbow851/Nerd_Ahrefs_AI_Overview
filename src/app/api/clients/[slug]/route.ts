@@ -11,6 +11,7 @@ const patchClientSchema = z.object({
     .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, 'Valid domain e.g. example.com')
     .optional(),
   kpi_keyword_target: z.number().int().min(1).max(9_999_999).optional(),
+  kpi_pass_threshold: z.number().min(1).max(100).optional(),
   focus_url_count: z.number().int().min(0).max(9_999_999).optional(),
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
   folder: z.string().max(80).nullable().optional(),
@@ -47,6 +48,16 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  if (body && typeof body === 'object' && 'commitment_type' in body) {
+    return NextResponse.json(
+      {
+        error:
+          'commitment_type cannot be changed after creation. Archive this project and create a new one.',
+      },
+      { status: 422 }
+    )
   }
 
   const parsed = patchClientSchema.safeParse(body)

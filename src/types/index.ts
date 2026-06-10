@@ -2,11 +2,18 @@
 // AI Overview Citation Tracker — Core Types
 // ============================================================
 
+export type CommitmentType = 'ai_citations' | 'legacy_main_longtail'
+export type KeywordTier = 'main' | 'longtail'
+
 export interface Client {
   id: string
   name: string
   domain: string
   slug: string
+  /** Measurement mode — immutable after project has snapshots. */
+  commitment_type: CommitmentType
+  /** Legacy mode: % of tracked keywords that must be AI-cited to pass KPI. */
+  kpi_pass_threshold: number
   /** Dashboard KPI target (not Ahrefs API limit). */
   kpi_keyword_target: number
   /** Planned/target focus URL count — denominator for "URLs Published" badge. */
@@ -34,6 +41,17 @@ export interface ClientUrl {
   last_fetched_at: string | null
 }
 
+export interface ClientTrackedKeyword {
+  id: string
+  client_id: string
+  url_id: string
+  keyword: string
+  tier: KeywordTier
+  is_active: boolean
+  sort_order: number
+  created_at: string
+}
+
 export interface Snapshot {
   id: string
   client_id: string
@@ -44,6 +62,9 @@ export interface Snapshot {
   total_citations: number | null
   total_serp_ai_overlap: number | null
   kpi_target: number | null
+  commitment_type: CommitmentType | null
+  kpi_pass_threshold: number | null
+  total_tracked_keywords: number | null
   notes: string | null
 }
 
@@ -57,6 +78,7 @@ export interface UrlKeywordResult {
   sum_traffic: number | null
   best_position_kind: string | null
   serp_features: string[] | null
+  keyword_tier: KeywordTier | null
   is_ai_cited: boolean
   created_at: string
 }
@@ -91,11 +113,13 @@ export interface UrlKpiRow {
   aiCitationsDelta: number | null
   keywords: {
     keyword: string
+    tier: KeywordTier | null
     kind: string | null
     position: number | null
     volume: number | null
     sum_traffic: number | null
     serp_features: string[] | null
+    isCited: boolean
   }[]
   /** Keywords that were in the previous-month snapshot but disappeared in this one. */
   missingKeywords: {
@@ -112,6 +136,7 @@ export interface ClientWithLatestSnapshot extends Client {
   snapshot_date: string | null
   total_urls: number | null
   total_citations: number | null
+  total_tracked_keywords: number | null
   kpi_pct: number | null
 }
 
@@ -167,16 +192,25 @@ export interface PullSnapshotRequest {
   date?: string // YYYY-MM-DD, defaults to getDefaultSnapshotDate() (yesterday local)
 }
 
+export interface LegacyUrlGroupInput {
+  url: string
+  main_keyword: string
+  longtail_keywords?: string[]
+}
+
 export interface CreateClientRequest {
   name: string
   domain: string
   slug: string
+  commitment_type?: CommitmentType
+  kpi_pass_threshold?: number
   kpi_keyword_target?: number
   focus_url_count?: number
   tags?: string[]
   folder?: string | null
   bulk_urls_text?: string
   bulk_urls_fetch_limit?: number
+  legacy_url_groups?: LegacyUrlGroupInput[]
 }
 
 export interface CreateUrlRequest {
@@ -194,12 +228,15 @@ export type ClientFormValues = {
   name: string
   domain: string
   slug: string
+  commitment_type: CommitmentType
+  kpi_pass_threshold: number
   kpi_keyword_target: number
   focus_url_count: number
   tags: string[]
   folder: string
   bulk_urls_text: string
   bulk_urls_fetch_limit: number
+  legacy_setup_text: string
 }
 
 export type UrlFormValues = {

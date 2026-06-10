@@ -55,10 +55,12 @@ export default async function EditClientPage({ params }: EditClientPageProps) {
         <div className="card-nerd p-6">
           <ProjectSettingsForm
             clientSlug={client.slug}
+            commitmentType={client.commitment_type ?? 'ai_citations'}
             initial={{
               name: client.name,
               domain: client.domain,
               kpi_keyword_target: client.kpi_keyword_target ?? 30,
+              kpi_pass_threshold: Number(client.kpi_pass_threshold ?? 70),
               focus_url_count: client.focus_url_count ?? 0,
               folder: client.folder ?? '',
               tags: client.tags ?? [],

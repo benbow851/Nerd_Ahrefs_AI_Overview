@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getClientBySlug, getClientUrls } from '@/lib/queries'
 import Topbar from '@/components/layout/Topbar'
 import UrlManagerClient from '@/components/client-detail/UrlManagerClient'
+import LegacyKeywordManager from '@/components/client-detail/LegacyKeywordManager'
+import { isLegacyCommitment } from '@/lib/kpi-calculator'
 
 interface ManageUrlsPageProps {
   params: { clientSlug: string }
@@ -54,8 +56,13 @@ export default async function ManageUrlsPage({ params }: ManageUrlsPageProps) {
           </div>
         </div>
 
-        {/* Client component handles add/edit form and table */}
-        <UrlManagerClient client={client} initialUrls={clientUrls} />
+        {isLegacyCommitment(client.commitment_type) && (
+          <LegacyKeywordManager clientSlug={client.slug} />
+        )}
+
+        {!isLegacyCommitment(client.commitment_type) && (
+          <UrlManagerClient client={client} initialUrls={clientUrls} />
+        )}
       </div>
     </>
   )

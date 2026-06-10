@@ -5,8 +5,10 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Loader2, Save } from 'lucide-react'
+import { COMMITMENT_TYPE_LABELS, isLegacyCommitment } from '@/lib/kpi-calculator'
 import { cn, normalizeRootDomain } from '@/lib/utils'
 import { TagInput } from '@/components/ui/tag-input'
+import type { CommitmentType } from '@/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Required'),
@@ -15,6 +17,7 @@ const schema = z.object({
     .min(1, 'Required')
     .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, 'Valid domain e.g. example.com'),
   kpi_keyword_target: z.coerce.number().int().min(1).max(9_999_999),
+  kpi_pass_threshold: z.coerce.number().min(1).max(100),
   focus_url_count: z.coerce.number().int().min(0).max(9_999_999),
   folder: z.string().max(80),
   tags: z.array(z.string().min(1).max(40)).max(20),
@@ -32,13 +35,16 @@ const inputCls = (hasError?: boolean) =>
 
 interface ProjectSettingsFormProps {
   clientSlug: string
+  commitmentType: CommitmentType
   initial: FormValues
 }
 
 export default function ProjectSettingsForm({
   clientSlug,
+  commitmentType,
   initial,
 }: ProjectSettingsFormProps) {
+  const legacy = isLegacyCommitment(commitmentType)
   const router = useRouter()
   const {
     register,
@@ -79,6 +85,18 @@ export default function ProjectSettingsForm({
       {errors.root && (
         <p className="text-sm text-[var(--status-danger)]">{errors.root.message}</p>
       )}
+
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)]/50 px-4 py-3">
+        <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1">
+          Measurement mode
+        </p>
+        <p className="text-sm font-medium text-[var(--text-primary)]">
+          {COMMITMENT_TYPE_LABELS[commitmentType]}
+        </p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          ไม่สามารถเปลี่ยนโหมดหลังสร้างโปรเจกต์ — ต้อง archive แล้วสร้างใหม่
+        </p>
+      </div>
 
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
@@ -138,26 +156,45 @@ export default function ProjectSettingsForm({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
-            KPI keyword / citation target
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={9_999_999}
-            {...register('kpi_keyword_target', { valueAsNumber: true })}
-            className={inputCls(!!errors.kpi_keyword_target)}
-          />
-          <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
-            Used by Dashboard cards and progress %.
-          </p>
-          {errors.kpi_keyword_target && (
-            <p className="mt-1 text-xs text-[var(--status-danger)]">
-              {errors.kpi_keyword_target.message}
+        {legacy ? (
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
+              KPI pass threshold (%)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              step={0.1}
+              {...register('kpi_pass_threshold', { valueAsNumber: true })}
+              className={inputCls(!!errors.kpi_pass_threshold)}
+            />
+            <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
+              ต้องติด AI Overview ≥ เปอร์เซ็นต์นี้ของ Main + Keywords รวม
             </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
+              KPI keyword / citation target
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={9_999_999}
+              {...register('kpi_keyword_target', { valueAsNumber: true })}
+              className={inputCls(!!errors.kpi_keyword_target)}
+            />
+            <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
+              Used by Dashboard cards and progress %.
+            </p>
+            {errors.kpi_keyword_target && (
+              <p className="mt-1 text-xs text-[var(--status-danger)]">
+                {errors.kpi_keyword_target.message}
+              </p>
+            )}
+          </div>
+        )}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
             Focus URL count
