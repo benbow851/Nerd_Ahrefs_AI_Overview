@@ -15,8 +15,10 @@ function clampFetchLimit(n: number): number {
 }
 
 /**
- * Fetch organic keywords for an exact URL where the URL ranks in the AI Overview
- * context (not merely keywords whose SERP has an unrelated AI Overview box).
+ * Fetch organic keywords for an exact URL where the URL is cited inside the
+ * AI Overview answer box (or its sitelinks). Stricter / cheaper than fetching
+ * every keyword on AI-Overview-bearing SERPs — keeps API spend down and
+ * produces only true citations.
  *
  * Uses `and` of `serp_features` + `positions_kinds` per Ahrefs filter syntax.
  * Two branches: `ai_overview` and `ai_overview_sitelink` pairs.

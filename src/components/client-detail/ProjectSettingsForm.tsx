@@ -1,11 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Loader2, Save } from 'lucide-react'
 import { cn, normalizeRootDomain } from '@/lib/utils'
+import { TagInput } from '@/components/ui/tag-input'
 
 const schema = z.object({
   name: z.string().min(1, 'Required'),
@@ -14,6 +15,9 @@ const schema = z.object({
     .min(1, 'Required')
     .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, 'Valid domain e.g. example.com'),
   kpi_keyword_target: z.coerce.number().int().min(1).max(9_999_999),
+  focus_url_count: z.coerce.number().int().min(0).max(9_999_999),
+  folder: z.string().max(80),
+  tags: z.array(z.string().min(1).max(40)).max(20),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -39,6 +43,7 @@ export default function ProjectSettingsForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
     setError,
   } = useForm<FormValues>({
@@ -54,6 +59,7 @@ export default function ProjectSettingsForm({
         body: JSON.stringify({
           ...data,
           domain: normalizeRootDomain(data.domain),
+          folder: data.folder.trim() || null,
         }),
       })
       const json = await res.json().catch(() => ({}))
@@ -96,24 +102,82 @@ export default function ProjectSettingsForm({
 
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
-          KPI keyword / citation target
+          Folder / group
         </label>
         <input
-          type="number"
-          min={1}
-          max={9_999_999}
-          {...register('kpi_keyword_target', { valueAsNumber: true })}
-          className={inputCls(!!errors.kpi_keyword_target)}
+          {...register('folder')}
+          placeholder="e.g. Acme Group, Internal, Q2 Launches"
+          className={inputCls(!!errors.folder)}
         />
         <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
-          ใช้สำหรับการ์ด Dashboard และ progress — ค่าจะถูกเก็บในโปรเจกต์และใช้คำนวณเปอร์เซ็นต์
-          จนกว่าจะแก้อีกครั้ง (ไม่ต้อง Pull ใหม่ถ้าแก้เฉพาะเป้า)
+          Optional — group projects together for filtering on the Projects list.
         </p>
-        {errors.kpi_keyword_target && (
-          <p className="mt-1 text-xs text-[var(--status-danger)]">
-            {errors.kpi_keyword_target.message}
-          </p>
+        {errors.folder && (
+          <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.folder.message}</p>
         )}
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
+          Tags
+        </label>
+        <Controller
+          control={control}
+          name="tags"
+          render={({ field }) => (
+            <TagInput
+              value={field.value}
+              onChange={field.onChange}
+              placeholder="Press Enter or comma to add a tag…"
+            />
+          )}
+        />
+        <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
+          Multi-select labels — reusable across projects (similar to SE Ranking).
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
+            KPI keyword / citation target
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={9_999_999}
+            {...register('kpi_keyword_target', { valueAsNumber: true })}
+            className={inputCls(!!errors.kpi_keyword_target)}
+          />
+          <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
+            Used by Dashboard cards and progress %.
+          </p>
+          {errors.kpi_keyword_target && (
+            <p className="mt-1 text-xs text-[var(--status-danger)]">
+              {errors.kpi_keyword_target.message}
+            </p>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
+            Focus URL count
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={9_999_999}
+            {...register('focus_url_count', { valueAsNumber: true })}
+            className={inputCls(!!errors.focus_url_count)}
+          />
+          <p className="mt-1.5 text-xs text-[var(--text-muted)] leading-relaxed">
+            Target focus URLs — denominator on the Published progress.
+          </p>
+          {errors.focus_url_count && (
+            <p className="mt-1 text-xs text-[var(--status-danger)]">
+              {errors.focus_url_count.message}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 pt-2">

@@ -59,6 +59,9 @@ export default async function EditClientPage({ params }: EditClientPageProps) {
               name: client.name,
               domain: client.domain,
               kpi_keyword_target: client.kpi_keyword_target ?? 30,
+              focus_url_count: client.focus_url_count ?? 0,
+              folder: client.folder ?? '',
+              tags: client.tags ?? [],
             }}
           />
         </div>

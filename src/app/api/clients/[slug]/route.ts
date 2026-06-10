@@ -11,6 +11,9 @@ const patchClientSchema = z.object({
     .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, 'Valid domain e.g. example.com')
     .optional(),
   kpi_keyword_target: z.number().int().min(1).max(9_999_999).optional(),
+  focus_url_count: z.number().int().min(0).max(9_999_999).optional(),
+  tags: z.array(z.string().min(1).max(40)).max(20).optional(),
+  folder: z.string().max(80).nullable().optional(),
   is_active: z.boolean().optional(),
 })
 
@@ -58,6 +61,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const payload = { ...parsed.data }
   if (payload.domain != null) {
     payload.domain = normalizeRootDomain(payload.domain)
+  }
+  if (payload.folder !== undefined) {
+    payload.folder = payload.folder?.trim() ? payload.folder.trim() : null
   }
   const { data, error } = await admin
     .from('clients')

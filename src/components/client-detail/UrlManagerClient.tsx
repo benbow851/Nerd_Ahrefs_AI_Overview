@@ -4,8 +4,22 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, X, Loader2, ToggleLeft, ToggleRight, ExternalLink, Layers } from 'lucide-react'
-import { cn, urlHostname, urlPath } from '@/lib/utils'
+import {
+  Plus,
+  Pencil,
+  X,
+  Loader2,
+  ToggleLeft,
+  ToggleRight,
+  ExternalLink,
+  Layers,
+  Trash2,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { cn, getDefaultSnapshotDate, urlHostname, urlPath } from '@/lib/utils'
 import type { Client, ClientUrl, UrlFormValues } from '@/types'
 import { DomainFavicon } from '@/components/ui/domain-favicon'
 
@@ -173,6 +187,7 @@ interface UrlManagerClientProps {
 }
 
 export default function UrlManagerClient({ client, initialUrls }: UrlManagerClientProps) {
+  const router = useRouter()
   const [urls, setUrls] = useState<ClientUrl[]>(initialUrls)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showBulkDialog, setShowBulkDialog] = useState(false)
@@ -182,6 +197,15 @@ export default function UrlManagerClient({ client, initialUrls }: UrlManagerClie
   const [bulkMessage, setBulkMessage] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [pullDialogId, setPullDialogId] = useState<string | null>(null)
+  const [pullDate, setPullDate] = useState<string>(getDefaultSnapshotDate())
+  const [pullLoading, setPullLoading] = useState(false)
+  const [pullStatus, setPullStatus] = useState<
+    | { kind: 'idle' }
+    | { kind: 'success'; date: string; citations: number }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' })
 
   // ── Add URL ──────────────────────────────────────────────────────────────────
   const handleAdd = async (data: UrlFormValues) => {
@@ -274,7 +298,87 @@ export default function UrlManagerClient({ client, initialUrls }: UrlManagerClie
     }
   }
 
+  // ── Delete URL ───────────────────────────────────────────────────────────────
+  const handleDelete = async (urlEntry: ClientUrl) => {
+    const ok = window.confirm(
+      `Delete "${urlEntry.label || urlPath(urlEntry.url)}"?\n\nThis removes the URL and all its keyword history. This cannot be undone.`,
+    )
+    if (!ok) return
+    setDeletingId(urlEntry.id)
+    try {
+      const res = await fetch(
+        `/api/clients/${client.slug}/urls/${urlEntry.id}`,
+        { method: 'DELETE' },
+      )
+      if (!res.ok && res.status !== 204) {
+        const json = await res.json().catch(() => ({}))
+        window.alert(json?.error ?? 'Delete failed')
+        return
+      }
+      setUrls((prev) => prev.filter((u) => u.id !== urlEntry.id))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // ── Single-URL Pull (with custom date) ───────────────────────────────────────
+  const openPullDialog = (urlId: string) => {
+    setPullDialogId(urlId)
+    setPullDate(getDefaultSnapshotDate())
+    setPullStatus({ kind: 'idle' })
+  }
+  const closePullDialog = () => {
+    setPullDialogId(null)
+    setPullStatus({ kind: 'idle' })
+  }
+
+  const handlePullSingle = async () => {
+    if (!pullDialogId) return
+    setPullLoading(true)
+    setPullStatus({ kind: 'idle' })
+    try {
+      const res = await fetch(
+        `/api/clients/${client.slug}/urls/${pullDialogId}/pull`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: pullDate }),
+        },
+      )
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPullStatus({
+          kind: 'error',
+          message: String(json?.error ?? 'Pull failed'),
+        })
+        return
+      }
+      const fetchedAt = new Date().toISOString()
+      setUrls((prev) =>
+        prev.map((u) =>
+          u.id === pullDialogId ? { ...u, last_fetched_at: fetchedAt } : u,
+        ),
+      )
+      setPullStatus({
+        kind: 'success',
+        date: json?.snapshotDate ?? pullDate,
+        citations: json?.citationCount ?? 0,
+      })
+      router.refresh()
+    } catch {
+      setPullStatus({
+        kind: 'error',
+        message: 'Network error — try again.',
+      })
+    } finally {
+      setPullLoading(false)
+    }
+  }
+
   const editingUrl = editingId ? urls.find((u) => u.id === editingId) : null
+  const pullDialogUrl = pullDialogId
+    ? urls.find((u) => u.id === pullDialogId)
+    : null
 
   return (
     <div className="space-y-4">
@@ -435,6 +539,94 @@ export default function UrlManagerClient({ client, initialUrls }: UrlManagerClie
         </div>
       )}
 
+      {/* Pull single URL dialog */}
+      {pullDialogId && pullDialogUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-md card-nerd p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                Pull this URL
+              </h3>
+              <button
+                onClick={closePullDialog}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                disabled={pullLoading}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)] mb-1 break-all">
+              <span className="font-mono">{pullDialogUrl.url}</span>
+            </p>
+            <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
+              Choose an Ahrefs <code>date</code>. Use the 1st of a month to
+              backfill that month&apos;s snapshot — other URLs in that snapshot
+              are kept as-is.
+            </p>
+
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] mb-1.5">
+              Ahrefs date (YYYY-MM-DD)
+            </label>
+            <input
+              type="date"
+              value={pullDate}
+              onChange={(e) => setPullDate(e.target.value)}
+              disabled={pullLoading}
+              className="w-full px-3 py-2 rounded-lg text-sm bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--blue)] disabled:opacity-60 mb-2"
+            />
+            <button
+              type="button"
+              onClick={() => setPullDate(getDefaultSnapshotDate())}
+              disabled={pullLoading}
+              className="text-[0.7rem] text-[var(--blue)] hover:underline disabled:opacity-50 mb-4"
+            >
+              ใช้เมื่อวาน (Bangkok)
+            </button>
+
+            {pullStatus.kind === 'success' && (
+              <div className="flex items-start gap-2 mb-3 rounded-lg px-3 py-2 border bg-[var(--status-success)]/10 border-[var(--status-success)]/30 text-[var(--status-success)] text-xs">
+                <CheckCircle size={14} className="shrink-0 mt-0.5" />
+                <span>
+                  Done — {pullStatus.date}. {pullStatus.citations} AI Overview
+                  hit{pullStatus.citations === 1 ? '' : 's'} found.
+                </span>
+              </div>
+            )}
+            {pullStatus.kind === 'error' && (
+              <div className="flex items-start gap-2 mb-3 rounded-lg px-3 py-2 border bg-[var(--status-danger)]/10 border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <span>{pullStatus.message}</span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={pullLoading || !pullDate}
+                onClick={handlePullSingle}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--blue)] hover:bg-[var(--accent-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {pullLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} strokeWidth={1.75} />
+                )}
+                {pullLoading ? `Pulling ${pullDate}…` : `Pull (${pullDate})`}
+              </button>
+              <button
+                type="button"
+                onClick={closePullDialog}
+                disabled={pullLoading}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* URLs table */}
       <div className="card-nerd overflow-hidden">
         {urls.length === 0 ? (
@@ -450,7 +642,7 @@ export default function UrlManagerClient({ client, initialUrls }: UrlManagerClie
                   <th className="text-center px-4 py-3 font-medium">Fetch limit</th>
                   <th className="text-center px-4 py-3 font-medium">Sort</th>
                   <th className="text-center px-4 py-3 font-medium">Active</th>
-                  <th className="text-center px-4 py-3 font-medium">Edit</th>
+                  <th className="text-center px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -515,15 +707,36 @@ export default function UrlManagerClient({ client, initialUrls }: UrlManagerClie
                       </button>
                     </td>
 
-                    {/* Edit button */}
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => setEditingId(urlEntry.id)}
-                        className="inline-flex items-center justify-center p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors"
-                        title="Edit URL"
-                      >
-                        <Pencil size={14} strokeWidth={1.75} />
-                      </button>
+                    {/* Actions: Pull / Edit / Delete */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => openPullDialog(urlEntry.id)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--blue)] hover:bg-white/5 transition-colors"
+                          title="Pull this URL for a specific date"
+                        >
+                          <RefreshCw size={14} strokeWidth={1.75} />
+                        </button>
+                        <button
+                          onClick={() => setEditingId(urlEntry.id)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors"
+                          title="Edit URL"
+                        >
+                          <Pencil size={14} strokeWidth={1.75} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(urlEntry)}
+                          disabled={deletingId === urlEntry.id}
+                          className="inline-flex items-center justify-center p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors disabled:opacity-50"
+                          title="Delete URL (and its keyword history)"
+                        >
+                          {deletingId === urlEntry.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} strokeWidth={1.75} />
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

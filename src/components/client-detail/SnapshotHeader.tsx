@@ -6,7 +6,8 @@ interface SnapshotHeaderProps {
   client: Client
   snapshot: Snapshot | null
   publishedUrlCount: number
-  totalUrlCount: number
+  /** Denominator for the URLs Published badge — focus_url_count if set, else added URLs. */
+  focusUrlDenominator: number
 }
 
 function isT0Baseline(date: string): boolean {
@@ -22,8 +23,11 @@ export default function SnapshotHeader({
   client,
   snapshot,
   publishedUrlCount,
-  totalUrlCount,
+  focusUrlDenominator,
 }: SnapshotHeaderProps) {
+  const folder = client.folder ?? null
+  const tags = client.tags ?? []
+
   return (
     <div className="flex flex-wrap items-start gap-4">
       {/* Client name + domain */}
@@ -49,6 +53,24 @@ export default function SnapshotHeader({
           </span>
         </div>
 
+        {(folder || tags.length > 0) && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            {folder && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-strong)]">
+                {folder}
+              </span>
+            )}
+            {tags.map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--blue)]/10 text-[var(--blue)] border border-[var(--blue)]/30"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Snapshot meta row */}
         {snapshot ? (
           <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -72,7 +94,7 @@ export default function SnapshotHeader({
                 'bg-[var(--blue)] text-white',
               )}
             >
-              {publishedUrlCount}/{totalUrlCount} URLs Published
+              {publishedUrlCount}/{focusUrlDenominator} URLs Published
             </span>
           </div>
         ) : (

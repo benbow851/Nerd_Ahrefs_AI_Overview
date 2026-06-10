@@ -83,6 +83,28 @@ export function ClientRow({ client }: ClientRowProps) {
         </span>
       </td>
 
+      {/* Folder + tags */}
+      <td className="py-3 px-4">
+        <div className="flex flex-wrap items-center gap-1.5 max-w-[260px]">
+          {client.folder && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-strong)]">
+              {client.folder}
+            </span>
+          )}
+          {(client.tags ?? []).map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--blue)]/10 text-[var(--blue)] border border-[var(--blue)]/30"
+            >
+              {t}
+            </span>
+          ))}
+          {!client.folder && (client.tags ?? []).length === 0 && (
+            <span className="text-xs text-[var(--text-muted)]">—</span>
+          )}
+        </div>
+      </td>
+
       {/* # URLs */}
       <td className="py-3 px-4 text-center text-[var(--text-secondary)]">
         {client.total_urls ?? '—'}

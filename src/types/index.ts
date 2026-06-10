@@ -9,6 +9,12 @@ export interface Client {
   slug: string
   /** Dashboard KPI target (not Ahrefs API limit). */
   kpi_keyword_target: number
+  /** Planned/target focus URL count — denominator for "URLs Published" badge. */
+  focus_url_count: number
+  /** Free-form tags for grouping projects. */
+  tags: string[]
+  /** Optional folder/group label (single value). */
+  folder: string | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -24,6 +30,8 @@ export interface ClientUrl {
   is_active: boolean
   sort_order: number
   created_at: string
+  /** Most recent successful Ahrefs Pull timestamp (null if never pulled). */
+  last_fetched_at: string | null
 }
 
 export interface Snapshot {
@@ -75,6 +83,12 @@ export interface UrlKpiRow {
   aiCitations: number
   /** Sum of Ahrefs `sum_traffic` for this URL; null if no traffic field in data. */
   totalSumTraffic: number | null
+  /** True once this URL has been part of any snapshot pull. */
+  everFetched: boolean
+  /** AI-cited keyword count from the previous-month snapshot for this URL (null if none to compare). */
+  previousAiCitations: number | null
+  /** current − previous AI-cited keyword count (null when no comparison data). */
+  aiCitationsDelta: number | null
   keywords: {
     keyword: string
     kind: string | null
@@ -82,6 +96,13 @@ export interface UrlKpiRow {
     volume: number | null
     sum_traffic: number | null
     serp_features: string[] | null
+  }[]
+  /** Keywords that were in the previous-month snapshot but disappeared in this one. */
+  missingKeywords: {
+    keyword: string
+    kind: string | null
+    position: number | null
+    volume: number | null
   }[]
 }
 
@@ -92,6 +113,15 @@ export interface ClientWithLatestSnapshot extends Client {
   total_urls: number | null
   total_citations: number | null
   kpi_pct: number | null
+}
+
+/** Movement / delta vs previous month for dashboard cards. */
+export interface SnapshotMovement {
+  citationsDelta: number | null
+  citationsPrev: number | null
+  kpiPctDelta: number | null
+  kpiPctPrev: number | null
+  previousMonthLabel: string | null
 }
 
 // ============================================================
@@ -142,6 +172,11 @@ export interface CreateClientRequest {
   domain: string
   slug: string
   kpi_keyword_target?: number
+  focus_url_count?: number
+  tags?: string[]
+  folder?: string | null
+  bulk_urls_text?: string
+  bulk_urls_fetch_limit?: number
 }
 
 export interface CreateUrlRequest {
@@ -160,6 +195,11 @@ export type ClientFormValues = {
   domain: string
   slug: string
   kpi_keyword_target: number
+  focus_url_count: number
+  tags: string[]
+  folder: string
+  bulk_urls_text: string
+  bulk_urls_fetch_limit: number
 }
 
 export type UrlFormValues = {

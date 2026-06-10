@@ -8,6 +8,8 @@ interface KpiCardProps {
   sub?: string
   color?: KpiCardColor
   icon?: React.ReactNode
+  /** Slot below the label/sub line (e.g. month-over-month delta). */
+  footer?: React.ReactNode
 }
 
 const valueColorMap: Record<KpiCardColor, string> = {
@@ -18,7 +20,14 @@ const valueColorMap: Record<KpiCardColor, string> = {
   danger:  'text-[#bf415c]',
 }
 
-export function KpiCard({ label, value, sub, color = 'default', icon }: KpiCardProps) {
+export function KpiCard({
+  label,
+  value,
+  sub,
+  color = 'default',
+  icon,
+  footer,
+}: KpiCardProps) {
   return (
     <div className="relative bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5">
       {icon && (
@@ -44,6 +53,8 @@ export function KpiCard({ label, value, sub, color = 'default', icon }: KpiCardP
       {sub && (
         <p className="mt-1 text-sm text-[var(--text-secondary)]">{sub}</p>
       )}
+
+      {footer}
     </div>
   )
 }
